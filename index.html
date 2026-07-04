@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BABIA · Control de Embarques</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥬</text></svg>">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=DM+Mono:wght@400;500&display=swap');
+:root{
+  --pine:#123B22; --moss:#1D5A31; --leaf:#3FA34D; --mint:#EAF3EC;
+  --paper:#F7FAF6; --card:#FFFFFF; --ink:#17241D; --mut:#5C6B60; --line:#DFE8E0;
+  --plan:#64748B; --mx:#C77700; --border:#1D4ED8; --usa:#0E7490;
+  --done:#2E7D32; --late:#C1341B; --cancel:#6B7280;
+  --sh:0 1px 3px rgba(18,59,34,.06), 0 6px 18px rgba(18,59,34,.06);
+  --r:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Archivo',sans-serif;background:var(--paper);color:var(--ink);min-height:100vh;font-size:14px;}
+button{font-family:'Archivo',sans-serif;}
+
+/* ── HEADER ─────────────────────────────── */
+header{background:var(--pine);color:#fff;padding:0 26px;height:62px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.logo{display:flex;align-items:center;gap:11px;}
+.mark{width:36px;height:36px;background:rgba(255,255,255,.12);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:19px;}
+.logo h1{font-size:18px;font-weight:800;font-stretch:125%;letter-spacing:3px;line-height:1;}
+.logo p{font-size:9px;letter-spacing:1.8px;color:rgba(255,255,255,.55);margin-top:2px;}
+.hdr-r{display:flex;align-items:center;gap:16px;}
+.sync{font-size:11px;color:rgba(255,255,255,.8);display:flex;align-items:center;gap:6px;}
+.dot{width:8px;height:8px;border-radius:50%;background:#7BE495;animation:pulse 2s infinite;}
+.dot.off{background:#FF6B5B;animation:none;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.hdr-date{font-family:'DM Mono',monospace;font-size:10px;color:rgba(255,255,255,.45);}
+
+main{max-width:1420px;margin:0 auto;padding:22px 26px 60px;}
+
+/* ── BANNER SETUP ───────────────────────── */
+.setup{display:none;background:#FFF7E6;border:1.5px solid #F0C36D;border-radius:var(--r);padding:14px 18px;margin-bottom:18px;font-size:13px;line-height:1.55;}
+.setup.on{display:block;}
+.setup b{color:#8a5a00;}
+.setup code{font-family:'DM Mono',monospace;background:#fff;padding:1px 6px;border-radius:4px;font-size:12px;}
+
+/* ── EL CORREDOR (pipeline) ─────────────── */
+.corr-wrap{margin-bottom:20px;}
+.corr-title{font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--mut);margin-bottom:10px;}
+.corr{display:flex;gap:0;align-items:stretch;flex-wrap:wrap;row-gap:8px;}
+.stage{position:relative;flex:1;min-width:130px;background:var(--card);border:1.5px solid var(--line);padding:11px 14px 11px 22px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:2px;}
+.stage:first-child{border-radius:10px 0 0 10px;padding-left:16px;}
+.stage:not(:first-child){margin-left:-1.5px;}
+.stage::after{content:'';position:absolute;right:-9px;top:50%;transform:translateY(-50%) rotate(45deg);width:16px;height:16px;border-top:1.5px solid var(--line);border-right:1.5px solid var(--line);background:var(--card);z-index:2;transition:all .15s;}
+.stage:last-of-type{border-radius:0 10px 10px 0;}
+.stage:last-of-type::after{display:none;}
+.stage:hover{background:var(--mint);}
+.stage:hover::after{background:var(--mint);}
+.stage.sel{background:var(--pine);border-color:var(--pine);}
+.stage.sel::after{background:var(--pine);border-color:var(--pine);}
+.stage.sel .st-n,.stage.sel .st-l{color:#fff;}
+.st-n{font-family:'DM Mono',monospace;font-size:22px;font-weight:500;line-height:1;}
+.st-l{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--mut);}
+.stage[data-s="plan"] .st-n{color:var(--plan);}
+.stage[data-s="mx"] .st-n{color:var(--mx);}
+.stage[data-s="border"] .st-n{color:var(--border);}
+.stage[data-s="usa"] .st-n{color:var(--usa);}
+.stage[data-s="done"] .st-n{color:var(--done);}
+.flags{display:flex;gap:8px;margin-left:14px;align-items:stretch;}
+.flag{background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:11px 16px;cursor:pointer;display:flex;flex-direction:column;gap:2px;transition:all .15s;}
+.flag:hover{background:#FDF1EF;}
+.flag.sel{background:var(--late);border-color:var(--late);}
+.flag.sel .st-n,.flag.sel .st-l{color:#fff;}
+.flag .st-n{color:var(--late);}
+.flag[data-s="cancel"] .st-n{color:var(--cancel);}
+.flag[data-s="cancel"].sel{background:var(--cancel);border-color:var(--cancel);}
+.flag[data-s="cancel"]:hover{background:#F1F3F4;}
+
+/* ── KPIs ───────────────────────────────── */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px;}
+.kpi{background:var(--card);border-radius:var(--r);border:1px solid var(--line);box-shadow:var(--sh);padding:14px 18px;}
+.kpi-l{font-size:9px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--mut);margin-bottom:6px;}
+.kpi-v{font-family:'DM Mono',monospace;font-size:28px;line-height:1;color:var(--pine);}
+.kpi-s{font-size:10px;color:#9AAA9E;margin-top:5px;}
+.kpi.warn .kpi-v{color:var(--late);}
+
+/* ── TOOLBAR ────────────────────────────── */
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;}
+.sec-t{font-size:15px;font-weight:800;font-stretch:115%;letter-spacing:.5px;}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;}
+.toolbar input,.toolbar select{font-family:'Archivo',sans-serif;font-size:12.5px;padding:8px 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);outline:none;transition:border-color .15s;}
+.toolbar input:focus,.toolbar select:focus{border-color:var(--leaf);}
+.toolbar input{min-width:230px;}
+.btn{border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:600;cursor:pointer;transition:all .15s;}
+.btn.ghost{background:var(--mint);color:var(--pine);}
+.btn.ghost:hover{background:#DCEDE0;}
+.btn.solid{background:var(--moss);color:#fff;margin-left:auto;}
+.btn.solid:hover{background:var(--pine);}
+
+/* ── TABLE ──────────────────────────────── */
+.tw{background:var(--card);border-radius:var(--r);border:1px solid var(--line);box-shadow:var(--sh);overflow:auto;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+thead th{background:var(--pine);color:rgba(255,255,255,.9);padding:10px 12px;font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;white-space:nowrap;position:sticky;top:0;cursor:pointer;user-select:none;z-index:5;}
+thead th:hover{background:var(--moss);}
+thead th .arw{font-size:8px;margin-left:3px;opacity:.8;}
+tbody tr{border-bottom:1px solid var(--line);transition:background .12s;}
+tbody tr:hover{background:var(--mint);}
+tbody tr.late-row{background:#FDF3F1;}
+tbody tr.late-row:hover{background:#FBE9E5;}
+tbody tr.pend{opacity:.55;}
+tbody td{padding:9px 12px;white-space:nowrap;vertical-align:middle;}
+.po{font-family:'DM Mono',monospace;font-size:11px;background:var(--mint);color:var(--pine);padding:2px 7px;border-radius:5px;}
+.ruta{line-height:1.3;}
+.ruta .o{font-size:11px;color:var(--mut);}
+.ruta .d{font-weight:600;}
+.mono{font-family:'DM Mono',monospace;font-size:11.5px;}
+.temp-b{font-family:'DM Mono',monospace;font-size:11px;color:var(--usa);background:#E8F5F8;padding:2px 7px;border-radius:5px;}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.3px;white-space:nowrap;}
+.pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;}
+.pill.plan{background:#EEF1F5;color:var(--plan);}
+.pill.mx{background:#FBF1E0;color:var(--mx);}
+.pill.border{background:#E7EDFC;color:var(--border);}
+.pill.usa{background:#E4F2F5;color:var(--usa);}
+.pill.done{background:#E7F2E8;color:var(--done);}
+.pill.late{background:#FBEAE6;color:var(--late);}
+.pill.cancel{background:#EEF0F1;color:var(--cancel);}
+.pill.none{background:#F3F4F3;color:#9AAA9E;}
+.inc-c{color:var(--late);max-width:190px;overflow:hidden;text-overflow:ellipsis;}
+.obs-c{color:var(--mut);max-width:220px;overflow:hidden;text-overflow:ellipsis;font-size:11.5px;}
+.act-b{background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;border-radius:5px;}
+.act-b:hover{background:var(--mint);}
+.empty{text-align:center;padding:48px;color:#9AAA9E;font-size:13px;}
+.empty .btn{margin-top:12px;}
+.pag{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--line);font-size:11px;color:var(--mut);}
+.pbtns{display:flex;gap:5px;}
+.pb{background:var(--mint);border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:11px;color:var(--pine);}
+.pb.active{background:var(--pine);color:#fff;}
+
+/* ── TABS ───────────────────────────────── */
+.tabs{display:flex;gap:6px;margin-bottom:18px;background:var(--mint);border-radius:10px;padding:4px;width:fit-content;}
+.tab{border:none;background:transparent;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;color:var(--pine);cursor:pointer;transition:all .15s;}
+.tab.sel{background:var(--pine);color:#fff;}
+
+/* ── CARRIERS ───────────────────────────── */
+.car-note{font-size:12px;color:var(--mut);margin-bottom:16px;max-width:720px;line-height:1.5;}
+.car-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
+.car-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:16px 18px;display:flex;flex-direction:column;gap:12px;}
+.car-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+.car-name{font-weight:800;font-stretch:112%;font-size:15px;letter-spacing:.3px;}
+.car-sub{font-size:10.5px;color:var(--mut);margin-top:3px;}
+.car-rank{font-family:'DM Mono',monospace;font-size:10px;color:#9AAA9E;margin-right:6px;}
+.gbig{display:flex;flex-direction:column;align-items:center;justify-content:center;width:52px;height:52px;border-radius:12px;font-weight:800;font-size:20px;line-height:1;color:#fff;flex-shrink:0;}
+.gbig span{font-family:'DM Mono',monospace;font-size:10px;font-weight:400;opacity:.85;margin-top:2px;}
+.gA{background:var(--done);} .gB{background:var(--leaf);} .gC{background:var(--mx);} .gD{background:#D35B2E;} .gF{background:var(--late);} .gN{background:#9AAA9E;}
+.bar-row{display:grid;grid-template-columns:96px 1fr 38px;align-items:center;gap:8px;font-size:10.5px;color:var(--mut);margin-bottom:6px;}
+.bar-row b{font-family:'DM Mono',monospace;font-size:11px;color:var(--ink);text-align:right;font-weight:500;}
+.bar{height:6px;background:var(--mint);border-radius:4px;overflow:hidden;}
+.bar i{display:block;height:100%;border-radius:4px;background:var(--leaf);}
+.bar i.mid{background:var(--mx);} .bar i.low{background:var(--late);}
+.car-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;border-top:1px solid var(--line);padding-top:11px;}
+.car-stats div{display:flex;flex-direction:column;gap:1px;}
+.car-stats b{font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:var(--pine);}
+.car-stats span{font-size:9px;letter-spacing:.4px;text-transform:uppercase;color:#9AAA9E;}
+.car-see{align-self:flex-start;padding:6px 12px;font-size:11.5px;}
+.gchip{display:inline-block;margin-left:6px;font-family:'DM Mono',monospace;font-size:9px;font-weight:500;color:#fff;padding:1px 5px;border-radius:4px;vertical-align:1px;}
+.hint{font-size:10.5px;color:var(--mut);margin-top:4px;line-height:1.45;min-height:0;}
+.hint b{color:var(--pine);font-family:'DM Mono',monospace;font-weight:500;}
+.tipo-f{background:#E7F2E8;color:var(--done);padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;}
+.tipo-v{background:#FBF1E0;color:var(--mx);padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;}
+.tipo-n{background:#EEF1F5;color:var(--plan);padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;}
+
+/* ── MODAL ──────────────────────────────── */
+.ov{display:none;position:fixed;inset:0;background:rgba(18,36,25,.5);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px);}
+.ov.on{display:flex;}
+.modal{background:var(--card);border-radius:14px;width:680px;max-width:95vw;max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(18,59,34,.3);animation:su .22s ease;}
+@keyframes su{from{transform:translateY(24px);opacity:0}to{transform:translateY(0);opacity:1}}
+.mhdr{background:var(--pine);padding:16px 22px;border-radius:14px 14px 0 0;display:flex;align-items:center;justify-content:space-between;}
+.mhdr h2{color:#fff;font-size:14px;font-weight:800;font-stretch:115%;letter-spacing:.5px;}
+.mclose{background:none;border:none;color:rgba(255,255,255,.7);font-size:20px;cursor:pointer;}
+.mbody{padding:22px;}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.fi{display:flex;flex-direction:column;gap:4px;}
+.fi.full{grid-column:1/-1;}
+.fi label{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--mut);}
+.fi label .req{color:var(--late);}
+.fi input,.fi select,.fi textarea{font-family:'Archivo',sans-serif;font-size:13px;padding:8px 11px;border:1.5px solid var(--line);border-radius:8px;color:var(--ink);outline:none;transition:border-color .15s;background:#fff;}
+.fi input:focus,.fi select:focus,.fi textarea:focus{border-color:var(--leaf);}
+.fi input.invalid{border-color:var(--late);}
+.fi textarea{resize:vertical;min-height:56px;}
+.mfoot{padding:14px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;}
+.bcn{background:var(--mint);border:none;border-radius:8px;padding:9px 16px;font-size:12.5px;cursor:pointer;color:var(--pine);font-weight:600;}
+.bsv{background:var(--moss);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:12.5px;font-weight:700;cursor:pointer;}
+.bsv:hover{background:var(--pine);}
+.bsv:disabled{background:#A8B5AB;cursor:not-allowed;}
+
+.toast{position:fixed;bottom:22px;right:22px;background:var(--pine);color:#fff;padding:12px 18px;border-radius:10px;font-size:12.5px;font-weight:600;box-shadow:0 6px 24px rgba(18,59,34,.3);z-index:999;transform:translateY(80px);opacity:0;transition:all .3s;max-width:340px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.err{background:var(--late);}
+
+@media(max-width:920px){
+  main{padding:14px 14px 50px;}
+  .kpis{grid-template-columns:1fr 1fr;}
+  .corr{flex-direction:column;}
+  .stage{border-radius:10px!important;margin-left:0!important;padding-left:16px;}
+  .stage::after{display:none;}
+  .corr{gap:8px;}
+  .flags{margin-left:0;margin-top:8px;}
+  .toolbar input{min-width:0;flex:1;}
+  .btn.solid{margin-left:0;flex:1;}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="mark">🥬</div>
+    <div><h1>BABIA</h1><p>CONTROL DE EMBARQUES · BAJÍO ⇄ USA</p></div>
+  </div>
+  <div class="hdr-r">
+    <div class="sync"><span class="dot" id="dot"></span><span id="syncLbl">Conectando…</span></div>
+    <div class="hdr-date" id="hdrDate"></div>
+  </div>
+</header>
+
+<main>
+  <div class="setup" id="setupBanner">
+    ⚙️ <b>Falta conectar el backend.</b> Instala el Apps Script en tu Google Sheet (archivo <code>Codigo.gs</code>), haz el deploy como Web App, y pega la URL <code>/exec</code> en la línea <code>const API</code> de este archivo.
+  </div>
+
+  <div class="tabs">
+    <button class="tab sel" data-v="emb" onclick="setView('emb')">📦 Embarques</button>
+    <button class="tab" data-v="car" onclick="setView('car')">🚛 Carriers</button>
+    <button class="tab" data-v="tar" onclick="setView('tar')">💵 Tarifas</button>
+  </div>
+
+  <div class="corr-wrap v-emb">
+    <div class="corr-title">El Corredor — ciclo de cada embarque</div>
+    <div style="display:flex;flex-wrap:wrap;align-items:stretch;">
+      <div class="corr" style="flex:1;min-width:280px;">
+        <div class="stage" data-s="plan" onclick="stageFilter('plan')"><span class="st-n" id="n-plan">—</span><span class="st-l">Programada</span></div>
+        <div class="stage" data-s="mx" onclick="stageFilter('mx')"><span class="st-n" id="n-mx">—</span><span class="st-l">Tránsito MX</span></div>
+        <div class="stage" data-s="border" onclick="stageFilter('border')"><span class="st-n" id="n-border">—</span><span class="st-l">Frontera</span></div>
+        <div class="stage" data-s="usa" onclick="stageFilter('usa')"><span class="st-n" id="n-usa">—</span><span class="st-l">Tránsito USA</span></div>
+        <div class="stage" data-s="done" onclick="stageFilter('done')"><span class="st-n" id="n-done">—</span><span class="st-l">Entregado</span></div>
+      </div>
+      <div class="flags">
+        <div class="flag" data-s="late" onclick="stageFilter('late')"><span class="st-n" id="n-late">—</span><span class="st-l">Retraso</span></div>
+        <div class="flag" data-s="cancel" onclick="stageFilter('cancel')"><span class="st-n" id="n-cancel">—</span><span class="st-l">Cancelado</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="kpis v-emb">
+    <div class="kpi"><div class="kpi-l">Cargas de hoy</div><div class="kpi-v" id="kHoy">—</div><div class="kpi-s">con día de carga hoy</div></div>
+    <div class="kpi"><div class="kpi-l">En ruta</div><div class="kpi-v" id="kRuta">—</div><div class="kpi-s">MX + frontera + USA</div></div>
+    <div class="kpi"><div class="kpi-l">Entregados · 7 días</div><div class="kpi-v" id="k7">—</div><div class="kpi-s">última semana</div></div>
+    <div class="kpi warn"><div class="kpi-l">Incidencias abiertas</div><div class="kpi-v" id="kInc">—</div><div class="kpi-s">en cargas no entregadas</div></div>
+  </div>
+
+  <div class="sec-h v-emb">
+    <div class="sec-t">Registro de Embarques</div>
+  </div>
+  <div class="toolbar v-emb">
+    <input type="text" id="srch" placeholder="🔍  Buscar PO, cliente, producto, ruta, transportista…">
+    <select id="fCli"><option value="">Todos los clientes</option></select>
+    <select id="fTi"><option value="">Todos los tipos</option><option>Exportación</option><option>Cross-Border</option><option>Nacional</option><option>Importación</option></select>
+    <button class="btn ghost" onclick="loadData(true)">🔄 Actualizar</button>
+    <button class="btn ghost" onclick="exportCSV()">⬇️ Exportar</button>
+    <button class="btn solid" onclick="openModal()">＋ Nuevo Embarque</button>
+  </div>
+
+  <div class="tw v-emb">
+    <table>
+      <thead><tr>
+        <th onclick="sb('id')">PO / ID<span class="arw" id="a-id"></span></th>
+        <th onclick="sb('cliente')">Cliente<span class="arw" id="a-cliente"></span></th>
+        <th>Producto</th><th>Tipo</th><th>Ruta</th><th>Transportista</th>
+        <th>Temp</th><th>Cajas</th><th>Peso</th><th>Tarifa</th>
+        <th onclick="sb('diaCarga')">Carga<span class="arw" id="a-diaCarga"></span></th>
+        <th onclick="sb('diaDescarga')">Descarga<span class="arw" id="a-diaDescarga"></span></th>
+        <th onclick="sb('fechaEntrega')">Entrega<span class="arw" id="a-fechaEntrega"></span></th>
+        <th>Días</th>
+        <th onclick="sb('estatus')">Estatus<span class="arw" id="a-estatus"></span></th>
+        <th>Incidencias</th><th>Notas</th><th></th>
+      </tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+    <div class="pag" id="pag"></div>
+  </div>
+
+  <div id="viewCar" style="display:none">
+    <div class="sec-h">
+      <div class="sec-t">Desempeño de Transportistas</div>
+    </div>
+    <p class="car-note">Calificación automática con base en la operación real: <b>35% On-Time Delivery</b> (descarga vs. fecha compromiso), <b>25% On-Time Pickup</b> (carga real vs. cita), <b>25% Temperatura</b> (llegada dentro de ±3°F de la requerida) y <b>15% incidencias</b>. Si a un carrier le falta algún dato, el peso se redistribuye entre los KPIs disponibles. Mínimo 2 entregas en el periodo para calificar.</p>
+    <div class="toolbar">
+      <select id="perSel">
+        <option value="all">📊 Todo el histórico</option>
+        <option value="tw">Esta semana</option>
+        <option value="lw">Semana pasada</option>
+        <option value="tm">Este mes</option>
+        <option value="lm">Mes pasado</option>
+        <option value="30">Últimos 30 días</option>
+      </select>
+      <span id="perInfo" style="font-size:11.5px;color:var(--mut);align-self:center"></span>
+    </div>
+    <div class="car-grid" id="carGrid"></div>
+  </div>
+
+  <div id="viewTar" style="display:none">
+    <div class="sec-h">
+      <div class="sec-t">Tarifas por Transportista y Ruta</div>
+    </div>
+    <p class="car-note">Las tarifas se capturan en cada embarque y aquí se concentran por carrier y ruta. Los carriers <b>Variable (spot)</b> cotizan según el mercado/DAT — usa la <b>última tarifa</b> como referencia. Los de tarifa <b>Fija</b> mantienen el mismo costo por ruta.</p>
+    <div class="toolbar">
+      <input type="text" id="srchTar" placeholder="🔍  Buscar carrier o ruta…">
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>Transportista</th><th>Ruta</th><th>Cargas</th>
+          <th>Última Tarifa</th><th>Fecha</th><th>Promedio</th><th>Rango</th><th>Tipo</th>
+        </tr></thead>
+        <tbody id="tbTar"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div class="ov" id="ov">
+  <div class="modal">
+    <div class="mhdr"><h2 id="mTitle">Nuevo Embarque</h2><button class="mclose" onclick="closeModal()">✕</button></div>
+    <div class="mbody">
+      <div class="fg">
+        <div class="fi"><label>PO / ID <span class="req">*</span></label><input id="fId" placeholder="117476213"/></div>
+        <div class="fi"><label>Cliente <span class="req">*</span></label><input id="fCl" list="cliList" placeholder="Walmex, BJS, OM…"/><datalist id="cliList"></datalist></div>
+        <div class="fi"><label>Producto</label><input id="fPr" list="prodList" placeholder="Broccoli, Coliflor, Apio…"/><datalist id="prodList"></datalist></div>
+        <div class="fi"><label>Tipo</label><select id="fTp"><option>Exportación</option><option>Cross-Border</option><option>Nacional</option><option>Importación</option></select></div>
+        <div class="fi"><label>Origen</label><input id="fOr" list="oriList" placeholder="San Miguel de Allende"/><datalist id="oriList"></datalist></div>
+        <div class="fi"><label>Destino</label><input id="fDe" list="desList" placeholder="McAllen, Tx"/><datalist id="desList"></datalist></div>
+        <div class="fi"><label>Transportista</label><input id="fTr" list="trList" placeholder="Armas, Radames, DIASA…"/><datalist id="trList"></datalist></div>
+        <div class="fi"><label>Temp Requerida °F</label><input id="fTm" type="number" placeholder="34"/></div>
+        <div class="fi"><label>Temp de Llegada °F</label><input id="fTL" type="number" placeholder="35"/></div>
+        <div class="fi"><label># Cajas</label><input id="fCa" type="number" placeholder="960"/></div>
+        <div class="fi"><label>Peso KG</label><input id="fPe" type="number" placeholder="18000"/></div>
+        <div class="fi full"><label>Tarifa USD</label><input id="fTa" type="number" step="0.01" placeholder="1850"/><div class="hint" id="tarifaHint"></div></div>
+        <div class="fi"><label>Cita de Carga (programada)</label><input id="fCC" type="date"/></div>
+        <div class="fi"><label>Día de Carga (real)</label><input id="fDC" type="date"/></div>
+        <div class="fi"><label>Día de Descarga</label><input id="fDD" type="date"/></div>
+        <div class="fi"><label>Fecha de Entrega</label><input id="fFE" type="date"/></div>
+        <div class="fi"><label>Estatus</label><select id="fEs">
+          <option>🚛 Unidad Programada</option>
+          <option>🛣️ En Tránsito MX</option>
+          <option>🛂 En Frontera</option>
+          <option>🛣️ En Tránsito USA</option>
+          <option>✅ Entregado</option>
+          <option>⚠️ Retraso</option>
+          <option>❌ Cancelado</option>
+        </select></div>
+        <div class="fi full"><label>Incidencias</label><input id="fIn" placeholder="Ponchadura, cambio de cita, rechazo…"/></div>
+        <div class="fi full"><label>Notas / Acciones</label><textarea id="fOb" placeholder="Cita en Walmart SMO 6:00am, se entrega en INCO Pharr…"></textarea></div>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="bcn" onclick="closeModal()">Cancelar</button>
+      <button class="bsv" id="bSv" onclick="saveEmbarque()">Guardar</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══ CONFIG ═══════════════════════════════════════════════════════════════
+// Pega aquí la URL /exec del Apps Script (paso 4-5 de Codigo.gs):
+const API = 'https://script.google.com/macros/s/AKfycbx1HNs405hYl3hTOzJUvGF9zopCS8Sm8fQKHcYvfc9mZwe01HKNq_e8eViR_yPScMHb3g/exec';
+// ═══════════════════════════════════════════════════════════════════════════
+
+const FIELDS = ['id','cliente','producto','tipo','origen','destino','transportista','temp','tempLlegada','peso','cajas','tarifa','citaCarga','diaCarga','diaDescarga','fechaEntrega','diasTr','estatus','incidencias','acciones'];
+const DATE_FIELDS = new Set(['citaCarga','diaCarga','diaDescarga','fechaEntrega']);
+const TEMP_TOL = 3; // tolerancia °F para cumplimiento de temperatura
+
+let data=[], editKey=null, sk=null, sa=true, pg=1, stageSel='';
+let modalOpen=false, saving=false;
+const PP=20;
+const apiReady = API.startsWith('https://');
+
+// ═══ ESTATUS → ETAPA ═══════════════════════════════════════════════════════
+function stage(s){
+  const t=(s||'').toLowerCase();
+  if(t.includes('cancel')) return 'cancel';
+  if(t.includes('retras')||t.includes('demora')) return 'late';
+  if(t.includes('entregad')) return 'done';
+  if(t.includes('usa')||t.includes('eeuu')||t.includes('eua')) return 'usa';
+  if(t.includes('fronter')) return 'border';
+  if(t.includes('tránsito')||t.includes('transito')||t.includes('ruta')||t.includes('camino')) return 'mx';
+  if(t.includes('program')||t.includes('unidad')||t.includes('asignad')) return 'plan';
+  return 'none';
+}
+const STAGE_LABEL={plan:'Programada',mx:'Tránsito MX',border:'Frontera',usa:'Tránsito USA',done:'Entregado',late:'Retraso',cancel:'Cancelado',none:'Sin estatus'};
+
+// ═══ CARGA DE DATOS ════════════════════════════════════════════════════════
+async function loadData(manual=false){
+  if(!apiReady){ setSync('err'); document.getElementById('setupBanner').classList.add('on'); render(); return; }
+  if(saving) return;
+  setSync('loading');
+  try{
+    const r = await fetch(API + '?t=' + Date.now(), {cache:'no-store'});
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error||'respuesta inválida');
+    // Normalizar fechas a ISO
+    j.rows.forEach(o=>{ DATE_FIELDS.forEach(f=>o[f]=toISO(o[f])); });
+    data = j.rows;
+    setSync('ok');
+    render();
+    refreshDatalists();
+    if(manual) toast('✅ Datos actualizados');
+  }catch(e){
+    setSync('err');
+    if(manual) toast('No se pudo conectar con el Sheet. Reintenta en unos segundos.', true);
+  }
+}
+
+function toISO(v){
+  if(!v) return '';
+  v=String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  let m=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);   // dd/mm/yyyy
+  if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  m=v.match(/^(\d{1,2})-([a-z]{3})-(\d{4})$/i);
+  const d=new Date(v);
+  return isNaN(d)?v:d.toISOString().slice(0,10);
+}
+
+async function callAPI(body){
+  const r = await fetch(API, {method:'POST', body: JSON.stringify(body)});
+  return r.json();
+}
+
+// ═══ HELPERS ═══════════════════════════════════════════════════════════════
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function setSync(s){
+  const d=document.getElementById('dot'), l=document.getElementById('syncLbl');
+  d.className='dot'+(s==='err'?' off':'');
+  const hora=new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  l.textContent=s==='ok'?`En vivo · ${hora}`:s==='loading'?'Actualizando…':'Sin conexión';
+}
+function toast(msg,err=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show'+(err?' err':'');
+  setTimeout(()=>t.className='toast',4000);
+}
+function fd(d){
+  if(!d)return'—';
+  const m=String(d).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m?`${m[3]}/${m[2]}`:String(d);
+}
+function today(){ return new Date().toLocaleDateString('sv-SE'); } // yyyy-mm-dd local
+function diasTr(e){
+  if(!e.diaCarga)return'—';
+  const a=new Date(e.diaCarga+'T12:00');
+  const st=stage(e.estatus);
+  let b=null, live=false;
+  if(e.diaDescarga){ b=new Date(e.diaDescarga+'T12:00'); }
+  else if(st==='mx'||st==='border'||st==='usa'||st==='late'){ b=new Date(); live=true; }
+  else return'—';
+  const diff=Math.round((b-a)/86400000);
+  return isNaN(diff)?'—':diff+'d'+(live?' ⏱':'');
+}
+function pill(s){
+  const st=stage(s);
+  const txt=(s||'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu,'').trim()||STAGE_LABEL[st];
+  return `<span class="pill ${st}">${esc(txt)}</span>`;
+}
+function hasInc(e){ return !!(e.incidencias&&e.incidencias.trim()); }
+
+// ═══ CARRIERS · DESEMPEÑO ══════════════════════════════════════════════════
+let view='emb', _gmap={};
+
+function setView(v){
+  view=v;
+  document.querySelectorAll('.v-emb').forEach(el=>el.style.display=v==='emb'?'':'none');
+  document.getElementById('viewCar').style.display=v==='car'?'':'none';
+  document.getElementById('viewTar').style.display=v==='tar'?'':'none';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('sel',t.dataset.v===v));
+  if(v==='car')renderCarriers();
+  if(v==='tar')renderTarifas();
+}
+
+function rateNum(v){
+  if(v==null||v==='')return null;
+  const n=parseFloat(String(v).replace(/[$,\s]/g,''));
+  return isNaN(n)?null:n;
+}
+function fmt$(n){return '$'+Number(n).toLocaleString('en-US',{maximumFractionDigits:0});}
+
+function carrierStats(rows){
+  rows=rows||data;
+  const map={};
+  rows.forEach(e=>{
+    const raw=(e.transportista||'').trim();
+    if(!raw)return;
+    const k=raw.toLowerCase();
+    if(!map[k])map[k]={name:raw,total:0,done:0,cancel:0,inc:0,otdOk:0,otdN:0,otpOk:0,otpN:0,tempOk:0,tempN:0,days:[],rates:[],active:0,last:''};
+    const c=map[k];
+    c.total++;
+    const st=stage(e.estatus);
+    if(st==='done')c.done++;
+    if(st==='cancel')c.cancel++;
+    if(st==='mx'||st==='border'||st==='usa'||st==='late')c.active++;
+    if(hasInc(e))c.inc++;
+    // On-Time Delivery: descarga real vs fecha compromiso
+    if(st==='done'&&e.diaDescarga&&e.fechaEntrega){c.otdN++;if(e.diaDescarga<=e.fechaEntrega)c.otdOk++;}
+    // On-Time Pickup: día de carga real vs cita programada
+    if(e.citaCarga&&e.diaCarga){c.otpN++;if(e.diaCarga<=e.citaCarga)c.otpOk++;}
+    // Temperatura: llegada dentro de ±TEMP_TOL °F de la requerida
+    const tr=rateNum(e.temp), tl=rateNum(e.tempLlegada);
+    if(st==='done'&&tr!=null&&tl!=null){c.tempN++;if(Math.abs(tl-tr)<=TEMP_TOL)c.tempOk++;}
+    if(st==='done'&&e.diaCarga&&e.diaDescarga){
+      const d=Math.round((new Date(e.diaDescarga+'T12:00')-new Date(e.diaCarga+'T12:00'))/86400000);
+      if(!isNaN(d)&&d>=0&&d<60)c.days.push(d);
+    }
+    const t=rateNum(e.tarifa); if(t!=null)c.rates.push(t);
+    if(e.diaCarga&&e.diaCarga>c.last)c.last=e.diaCarga;
+  });
+  return Object.values(map).map(c=>{
+    c.otd=c.otdN?c.otdOk/c.otdN:null;
+    c.otp=c.otpN?c.otpOk/c.otpN:null;
+    c.tempPct=c.tempN?c.tempOk/c.tempN:null;
+    c.incRate=c.total?c.inc/c.total:0;
+    c.avgDays=c.days.length?c.days.reduce((a,b)=>a+b,0)/c.days.length:null;
+    c.avgRate=c.rates.length?c.rates.reduce((a,b)=>a+b,0)/c.rates.length:null;
+    if(c.done>=2){
+      // Score reponderado según los KPIs con datos: OTD 35%, OTP 25%, Temp 25%, Incidencias 15%
+      const comps=[];
+      if(c.otd!=null)comps.push([0.35,c.otd]);
+      if(c.otp!=null)comps.push([0.25,c.otp]);
+      if(c.tempPct!=null)comps.push([0.25,c.tempPct]);
+      comps.push([0.15,1-c.incRate]);
+      const wsum=comps.reduce((a,p)=>a+p[0],0);
+      c.score=Math.round(100*comps.reduce((a,p)=>a+p[0]*p[1],0)/wsum);
+      c.grade=c.score>=90?'A':c.score>=80?'B':c.score>=70?'C':c.score>=60?'D':'F';
+    }else{c.score=null;c.grade=null;}
+    return c;
+  }).sort((a,b)=>((b.score??-1)-(a.score??-1))||b.total-a.total);
+}
+
+// Evaluación por periodo: semana / mes (la carga cuenta en el periodo de su día de carga)
+function periodRows(){
+  const sel=document.getElementById('perSel')?document.getElementById('perSel').value:'all';
+  if(sel==='all')return{rows:data,label:'todo el histórico'};
+  const now=new Date();now.setHours(12,0,0,0);
+  const iso=d=>d.toLocaleDateString('sv-SE');
+  const dow=(now.getDay()+6)%7; // lunes = inicio de semana
+  let from,to;
+  if(sel==='tw'){from=new Date(now);from.setDate(now.getDate()-dow);to=new Date(now);}
+  else if(sel==='lw'){to=new Date(now);to.setDate(now.getDate()-dow-1);from=new Date(to);from.setDate(to.getDate()-6);}
+  else if(sel==='tm'){from=new Date(now.getFullYear(),now.getMonth(),1,12);to=new Date(now);}
+  else if(sel==='lm'){from=new Date(now.getFullYear(),now.getMonth()-1,1,12);to=new Date(now.getFullYear(),now.getMonth(),0,12);}
+  else{from=new Date(now);from.setDate(now.getDate()-30);to=new Date(now);}
+  const f=iso(from),t=iso(to);
+  return{
+    rows:data.filter(e=>{const d=e.diaCarga||e.citaCarga||e.fechaEntrega;return d&&d>=f&&d<=t;}),
+    label:`${fd(f)} al ${fd(t)}`
+  };
+}
+
+function gchipFor(name){
+  const g=_gmap[(name||'').trim().toLowerCase()];
+  return g?`<span class="gchip g${g}">${g}</span>`:'';
+}
+
+function barCls(pct){ return pct>=85?'':pct>=65?'mid':'low'; }
+
+function renderCarriers(){
+  const per=periodRows();
+  const list=carrierStats(per.rows);
+  document.getElementById('perInfo').textContent=`${per.rows.length} carga${per.rows.length!==1?'s':''} · ${per.label}`;
+  const grid=document.getElementById('carGrid');
+  if(!list.length){
+    grid.innerHTML='<div class="empty" style="grid-column:1/-1">🚛 No hay cargas de transportistas en este periodo.</div>';
+    return;
+  }
+  const barRow=(label,frac)=>{
+    const pct=frac==null?null:Math.round(frac*100);
+    return `<div class="bar-row"><span>${label}</span><div class="bar"><i class="${pct==null?'':barCls(pct)}" style="width:${pct==null?0:pct}%"></i></div><b>${pct==null?'s/d':pct+'%'}</b></div>`;
+  };
+  grid.innerHTML=list.map((c,i)=>{
+    const badge=c.grade
+      ?`<div class="gbig g${c.grade}" title="Score ${c.score}/100">${c.grade}<span>${c.score}</span></div>`
+      :`<div class="gbig gN" title="Se necesitan 2+ entregas para calificar">—<span>nuevo</span></div>`;
+    return `<div class="car-card">
+      <div class="car-top">
+        <div>
+          <div class="car-name"><span class="car-rank">#${i+1}</span>${esc(c.name)}</div>
+          <div class="car-sub">${c.total} carga${c.total!==1?'s':''}${c.last?` · última ${fd(c.last)}`:''}</div>
+        </div>
+        ${badge}
+      </div>
+      <div>
+        ${barRow('OT Delivery',c.otd)}
+        ${barRow('OT Pickup',c.otp)}
+        ${barRow('Temp OK',c.tempPct)}
+        ${barRow('Sin incidencias',1-c.incRate)}
+      </div>
+      <div class="car-stats">
+        <div><b>${c.active}</b><span>en ruta</span></div>
+        <div><b>${c.done}</b><span>entregadas</span></div>
+        <div><b>${c.avgDays==null?'—':c.avgDays.toFixed(1)+'d'}</b><span>tránsito</span></div>
+        <div><b>${c.avgRate==null?'—':fmt$(c.avgRate)}</b><span>tarifa prom</span></div>
+      </div>
+      <button class="btn ghost car-see" onclick='verCargas(${JSON.stringify(c.name)})'>Ver sus cargas →</button>
+    </div>`;
+  }).join('');
+}
+
+function verCargas(name){
+  setView('emb');
+  clearFilters();
+  document.getElementById('srch').value=name;
+  pg=1;render();
+}
+
+// ═══ TARIFAS ═══════════════════════════════════════════════════════════════
+function rateStats(){
+  const lanes={};
+  data.forEach(e=>{
+    const t=rateNum(e.tarifa);
+    if(t==null)return;
+    const car=(e.transportista||'').trim();
+    if(!car)return;
+    const ruta=`${(e.origen||'—').trim()} → ${(e.destino||'—').trim()}`;
+    const k=(car+'|'+ruta).toLowerCase();
+    if(!lanes[k])lanes[k]={car,ruta,rates:[],lastRate:null,lastDate:''};
+    const L=lanes[k];
+    L.rates.push(t);
+    const d=e.diaCarga||e.citaCarga||e.fechaEntrega||'';
+    if(d>=L.lastDate){L.lastDate=d;L.lastRate=t;}
+  });
+  return Object.values(lanes).map(L=>{
+    L.n=L.rates.length;
+    L.avg=L.rates.reduce((a,b)=>a+b,0)/L.n;
+    L.min=Math.min(...L.rates);
+    L.max=Math.max(...L.rates);
+    L.tipo=L.n<2?'n':((L.max-L.min)/L.avg>0.02?'v':'f'); // n=1 dato, v=variable/spot, f=fija
+    return L;
+  }).sort((a,b)=>a.car.localeCompare(b.car,'es')||b.n-a.n);
+}
+
+function renderTarifas(){
+  const q=(document.getElementById('srchTar').value||'').toLowerCase().trim();
+  let list=rateStats();
+  if(q)list=list.filter(L=>L.car.toLowerCase().includes(q)||L.ruta.toLowerCase().includes(q));
+  const tb=document.getElementById('tbTar');
+  if(!list.length){
+    tb.innerHTML='<tr><td colspan="8"><div class="empty">💵 Aún no hay tarifas registradas.<br>Captura la tarifa en cada embarque y aquí se van concentrando por carrier y ruta.</div></td></tr>';
+    return;
+  }
+  const TIPO={f:'<span class="tipo-f">Fija</span>',v:'<span class="tipo-v">Variable (spot)</span>',n:'<span class="tipo-n">1 dato</span>'};
+  tb.innerHTML=list.map(L=>`<tr>
+    <td style="font-weight:600">${esc(L.car)}${gchipFor(L.car)}</td>
+    <td>${esc(L.ruta)}</td>
+    <td class="mono">${L.n}</td>
+    <td class="mono" style="font-weight:500;color:var(--pine)">${fmt$(L.lastRate)}</td>
+    <td class="mono">${fd(L.lastDate)}</td>
+    <td class="mono">${fmt$(L.avg)}</td>
+    <td class="mono">${L.min===L.max?fmt$(L.min):fmt$(L.min)+' – '+fmt$(L.max)}</td>
+    <td>${TIPO[L.tipo]}</td>
+  </tr>`).join('');
+}
+
+// Referencia de tarifa histórica al capturar un embarque
+function updateTarifaHint(){
+  const hint=document.getElementById('tarifaHint');
+  const car=(document.getElementById('fTr').value||'').trim().toLowerCase();
+  if(!car){hint.innerHTML='';return;}
+  const ori=(document.getElementById('fOr').value||'').trim().toLowerCase();
+  const des=(document.getElementById('fDe').value||'').trim().toLowerCase();
+  const matches=data.filter(e=>{
+    if(rateNum(e.tarifa)==null)return false;
+    if((e.transportista||'').trim().toLowerCase()!==car)return false;
+    if(ori&&(e.origen||'').trim().toLowerCase()!==ori)return false;
+    if(des&&(e.destino||'').trim().toLowerCase()!==des)return false;
+    return true;
+  });
+  if(!matches.length){hint.innerHTML='Sin histórico de tarifa para este carrier'+(des?' en esta ruta':'')+'.';return;}
+  const rates=matches.map(e=>rateNum(e.tarifa));
+  const avg=rates.reduce((a,b)=>a+b,0)/rates.length;
+  const mn=Math.min(...rates),mx=Math.max(...rates);
+  let lastR=null,lastD='';
+  matches.forEach(e=>{const d=e.diaCarga||e.citaCarga||'';if(d>=lastD){lastD=d;lastR=rateNum(e.tarifa);}});
+  const scope=des?'esta ruta':(ori?'este origen':'todas sus rutas');
+  hint.innerHTML=`📊 Histórico en ${scope} (${rates.length} carga${rates.length!==1?'s':''}): última <b>${fmt$(lastR)}</b>${lastD?' ('+fd(lastD)+')':''} · promedio <b>${fmt$(avg)}</b>${mn!==mx?` · rango <b>${fmt$(mn)}–${fmt$(mx)}</b>`:' · tarifa fija'}`;
+}
+
+// ═══ FILTROS ═══════════════════════════════════════════════════════════════
+function stageFilter(s){
+  stageSel = (stageSel===s)?'':s;
+  pg=1; render();
+}
+function filtered(){
+  const q=document.getElementById('srch').value.toLowerCase().trim();
+  const cli=document.getElementById('fCli').value;
+  const ti=document.getElementById('fTi').value;
+  return data.filter(e=>{
+    const mQ=!q||[e.id,e.cliente,e.producto,e.origen,e.destino,e.transportista,e.acciones].some(v=>v&&v.toLowerCase().includes(q));
+    const mC=!cli||e.cliente===cli;
+    const mT=!ti||e.tipo===ti;
+    const mS=!stageSel||stage(e.estatus)===stageSel;
+    return mQ&&mC&&mT&&mS;
+  }).sort((a,b)=>{
+    if(!sk){
+      // Por default: activos primero (por día de carga desc), entregados/cancelados al final
+      const oa=(stage(a.estatus)==='done'||stage(a.estatus)==='cancel')?1:0;
+      const ob=(stage(b.estatus)==='done'||stage(b.estatus)==='cancel')?1:0;
+      if(oa!==ob)return oa-ob;
+      return String(b.diaCarga||'').localeCompare(String(a.diaCarga||''));
+    }
+    let va=a[sk]||'',vb=b[sk]||'',cmp;
+    if(DATE_FIELDS.has(sk))cmp=String(va).localeCompare(String(vb));
+    else if(va!==''&&vb!==''&&!isNaN(va)&&!isNaN(vb))cmp=Number(va)-Number(vb);
+    else cmp=String(va).localeCompare(String(vb),'es',{numeric:true});
+    return sa?cmp:-cmp;
+  });
+}
+
+// ═══ RENDER ════════════════════════════════════════════════════════════════
+function render(){
+  // Calificaciones de carriers (para los chips de la tabla)
+  _gmap={};
+  carrierStats().forEach(c=>{if(c.grade)_gmap[c.name.toLowerCase()]=c.grade;});
+  if(view==='car')renderCarriers();
+  if(view==='tar')renderTarifas();
+  // Corredor (sobre todos los datos)
+  const counts={plan:0,mx:0,border:0,usa:0,done:0,late:0,cancel:0,none:0};
+  data.forEach(e=>counts[stage(e.estatus)]++);
+  ['plan','mx','border','usa','done','late','cancel'].forEach(s=>{
+    document.getElementById('n-'+s).textContent=counts[s];
+    const el=document.querySelector(`[data-s="${s}"]`);
+    el.classList.toggle('sel',stageSel===s);
+  });
+  // KPIs
+  const hoy=today();
+  document.getElementById('kHoy').textContent=data.filter(e=>e.diaCarga===hoy).length;
+  document.getElementById('kRuta').textContent=counts.mx+counts.border+counts.usa;
+  const hace7=new Date(Date.now()-7*86400000).toLocaleDateString('sv-SE');
+  document.getElementById('k7').textContent=data.filter(e=>stage(e.estatus)==='done'&&e.diaDescarga>=hace7).length;
+  document.getElementById('kInc').textContent=data.filter(e=>hasInc(e)&&stage(e.estatus)!=='done'&&stage(e.estatus)!=='cancel').length;
+  // Flechas
+  document.querySelectorAll('.arw').forEach(el=>el.textContent='');
+  if(sk){const a=document.getElementById('a-'+sk);if(a)a.textContent=sa?'▲':'▼';}
+  // Tabla
+  const f=filtered();
+  const s=(pg-1)*PP, paged=f.slice(s,s+PP);
+  const tb=document.getElementById('tb');
+  if(!f.length){
+    tb.innerHTML=`<tr><td colspan="18"><div class="empty">🥬 No hay embarques con estos filtros.<br><button class="btn ghost" onclick="clearFilters()">Limpiar filtros</button></div></td></tr>`;
+    document.getElementById('pag').innerHTML='';
+    return;
+  }
+  tb.innerHTML=paged.map(e=>{
+    const st=stage(e.estatus);
+    return `<tr class="${st==='late'?'late-row':''}${e._pend?' pend':''}" title="${e._pend?'Guardando en Google Sheets…':''}">
+    <td><span class="po">${esc(e.id)||'—'}</span></td>
+    <td style="font-weight:600">${esc(e.cliente)||'—'}</td>
+    <td>${esc(e.producto)||'—'}</td>
+    <td style="color:var(--mut);font-size:11.5px">${esc(e.tipo)||'—'}</td>
+    <td class="ruta"><div class="o">${esc(e.origen)||'—'}</div><div class="d">→ ${esc(e.destino)||'—'}</div></td>
+    <td>${esc(e.transportista)||'—'}${gchipFor(e.transportista)}</td>
+    <td>${e.temp!==''?`<span class="temp-b">${esc(e.temp)}°F</span>`:'—'}</td>
+    <td class="mono">${esc(e.cajas)||'—'}</td>
+    <td class="mono">${e.peso&&!isNaN(e.peso)?Number(e.peso).toLocaleString('es-MX'):(esc(e.peso)||'—')}</td>
+    <td class="mono">${rateNum(e.tarifa)!=null?fmt$(rateNum(e.tarifa)):'—'}</td>
+    <td class="mono">${fd(e.diaCarga)}</td>
+    <td class="mono">${fd(e.diaDescarga)}</td>
+    <td class="mono">${fd(e.fechaEntrega)}</td>
+    <td class="mono">${diasTr(e)}</td>
+    <td>${pill(e.estatus)}</td>
+    <td class="inc-c" title="${esc(e.incidencias)}">${esc(e.incidencias)||'<span style="color:#C6D2C9">—</span>'}</td>
+    <td class="obs-c" title="${esc(e.acciones)}">${esc(e.acciones)||'—'}</td>
+    <td style="white-space:nowrap">
+      <button class="act-b" onclick='editRow(${JSON.stringify(String(e.key))})' title="Editar">✏️</button>
+      <button class="act-b" onclick='delRow(${JSON.stringify(String(e.key))})' title="Eliminar">🗑️</button>
+    </td>
+  </tr>`;}).join('');
+  const tp=Math.ceil(f.length/PP);
+  let btns='';
+  for(let p=1;p<=tp;p++)btns+=`<button class="pb${p===pg?' active':''}" onclick="goP(${p})">${p}</button>`;
+  document.getElementById('pag').innerHTML=`<span>Mostrando ${s+1}–${Math.min(s+PP,f.length)} de ${f.length}${stageSel?` · ${STAGE_LABEL[stageSel]}`:''}</span><div class="pbtns">${btns}</div>`;
+}
+
+function clearFilters(){
+  document.getElementById('srch').value='';
+  document.getElementById('fCli').value='';
+  document.getElementById('fTi').value='';
+  stageSel=''; pg=1; render();
+}
+function goP(p){pg=p;render();}
+function sb(k){sk===k?sa=!sa:(sk=k,sa=true);pg=1;render();}
+
+// Autocompletar con lo que ya existe en la operación
+function refreshDatalists(){
+  const fill=(listId,vals)=>{
+    document.getElementById(listId).innerHTML=[...new Set(vals.filter(Boolean))].sort().map(v=>`<option value="${esc(v)}">`).join('');
+  };
+  fill('cliList',data.map(e=>e.cliente));
+  fill('prodList',data.map(e=>e.producto));
+  fill('oriList',data.map(e=>e.origen));
+  fill('desList',data.map(e=>e.destino));
+  fill('trList',data.map(e=>e.transportista));
+  const sel=document.getElementById('fCli');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Todos los clientes</option>'+[...new Set(data.map(e=>e.cliente).filter(Boolean))].sort().map(c=>`<option${c===cur?' selected':''}>${esc(c)}</option>`).join('');
+}
+
+// ═══ EXPORT ════════════════════════════════════════════════════════════════
+function exportCSV(){
+  const f=filtered();
+  if(!f.length){toast('No hay datos para exportar',true);return;}
+  const head=FIELDS.join(',');
+  const body=f.map(e=>FIELDS.map(k=>{
+    let v=k==='diasTr'?diasTr(e).replace(' ⏱',''):String(e[k]||'');
+    return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;
+  }).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+head+'\n'+body],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`babia_embarques_${today()}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('✅ CSV exportado');
+}
+
+// ═══ MODAL / CRUD ══════════════════════════════════════════════════════════
+function openModal(e=null){
+  editKey=e?String(e.key):null;
+  modalOpen=true;
+  document.getElementById('mTitle').textContent=e?'Editar Embarque':'Nuevo Embarque';
+  const m=e||{};
+  document.getElementById('fId').value=m.id||'';
+  document.getElementById('fCl').value=m.cliente||'';
+  document.getElementById('fPr').value=m.producto||'';
+  document.getElementById('fTp').value=m.tipo||'Exportación';
+  document.getElementById('fOr').value=m.origen||'San Miguel de Allende';
+  document.getElementById('fDe').value=m.destino||'';
+  document.getElementById('fTr').value=m.transportista||'';
+  document.getElementById('fTm').value=m.temp!=null&&m.temp!==''?m.temp:'34';
+  document.getElementById('fTL').value=m.tempLlegada||'';
+  document.getElementById('fCa').value=m.cajas||'';
+  document.getElementById('fPe').value=m.peso||'';
+  document.getElementById('fTa').value=(m.tarifa!=null&&m.tarifa!=='')?(rateNum(m.tarifa)??m.tarifa):'';
+  document.getElementById('fCC').value=m.citaCarga||'';
+  document.getElementById('fDC').value=m.diaCarga||'';
+  document.getElementById('fDD').value=m.diaDescarga||'';
+  document.getElementById('fFE').value=m.fechaEntrega||'';
+  document.getElementById('fEs').value=matchStatus(m.estatus)||'🚛 Unidad Programada';
+  document.getElementById('fIn').value=m.incidencias||'';
+  document.getElementById('fOb').value=m.acciones||'';
+  document.getElementById('fId').classList.remove('invalid');
+  document.getElementById('fCl').classList.remove('invalid');
+  updateTarifaHint();
+  document.getElementById('ov').classList.add('on');
+}
+function matchStatus(s){
+  if(!s)return'';
+  const opts=[...document.getElementById('fEs').options].map(o=>o.value);
+  if(opts.includes(s))return s;
+  const st=stage(s);
+  const map={plan:'🚛 Unidad Programada',mx:'🛣️ En Tránsito MX',border:'🛂 En Frontera',usa:'🛣️ En Tránsito USA',done:'✅ Entregado',late:'⚠️ Retraso',cancel:'❌ Cancelado'};
+  return map[st]||'';
+}
+function closeModal(){document.getElementById('ov').classList.remove('on');modalOpen=false;}
+function editRow(key){const e=data.find(x=>String(x.key)===String(key));if(e)openModal(e);}
+
+async function delRow(key){
+  const e=data.find(x=>String(x.key)===String(key));
+  if(!e)return;
+  if(!confirm(`¿Eliminar el embarque ${e.id} (${e.cliente})? También se borra del Google Sheet.`))return;
+  data=data.filter(x=>String(x.key)!==String(key));
+  render();
+  try{
+    const r=await callAPI({action:'delete',key});
+    toast(r.ok?'✅ Eliminado':'⚠️ '+(r.error||'Error al eliminar'),!r.ok);
+    if(!r.ok)loadData();
+  }catch(err){
+    toast('⚠️ Sin conexión — el registro puede seguir en el Sheet',true);
+    loadData();
+  }
+}
+
+async function saveEmbarque(){
+  if(!apiReady){toast('Primero conecta el Apps Script (banner amarillo arriba)',true);return;}
+  const idEl=document.getElementById('fId'),clEl=document.getElementById('fCl');
+  const id=idEl.value.trim(),cliente=clEl.value.trim();
+  let bad=false;
+  idEl.classList.toggle('invalid',!id);if(!id)bad=true;
+  clEl.classList.toggle('invalid',!cliente);if(!cliente)bad=true;
+  if(bad){toast('El PO/ID y el Cliente son obligatorios',true);return;}
+  if(!editKey&&data.some(e=>String(e.id)===id)){
+    if(!confirm(`Ya existe un embarque con el PO ${id}. ¿Registrar de todos modos?`))return;
+  }
+  const btn=document.getElementById('bSv');
+  btn.disabled=true;btn.textContent='Guardando…';saving=true;
+  const dc=document.getElementById('fDC').value,dd_=document.getElementById('fDD').value;
+  let dt='';
+  if(dc&&dd_){const diff=Math.round((new Date(dd_+'T12:00')-new Date(dc+'T12:00'))/86400000);if(!isNaN(diff))dt=diff;}
+  const entry={
+    id,cliente,
+    producto:document.getElementById('fPr').value.trim(),
+    tipo:document.getElementById('fTp').value,
+    origen:document.getElementById('fOr').value.trim(),
+    destino:document.getElementById('fDe').value.trim(),
+    transportista:document.getElementById('fTr').value.trim(),
+    temp:document.getElementById('fTm').value,
+    tempLlegada:document.getElementById('fTL').value,
+    cajas:document.getElementById('fCa').value,
+    peso:document.getElementById('fPe').value,
+    tarifa:document.getElementById('fTa').value,
+    citaCarga:document.getElementById('fCC').value,
+    diaCarga:dc,diaDescarga:dd_,
+    fechaEntrega:document.getElementById('fFE').value,
+    diasTr:dt,
+    estatus:document.getElementById('fEs').value,
+    incidencias:document.getElementById('fIn').value.trim(),
+    acciones:document.getElementById('fOb').value.trim(),
+  };
+  // Optimista: se ve al instante
+  let local;
+  if(editKey){
+    local=data.find(x=>String(x.key)===String(editKey));
+    Object.assign(local,entry);local._pend=true;
+  }else{
+    local={...entry,key:'tmp-'+Date.now(),_pend:true};
+    data.unshift(local);
+  }
+  closeModal();render();
+  try{
+    const r=await callAPI({action:editKey?'update':'add',key:editKey||undefined,...entry});
+    if(r.ok){
+      if(r.key)local.key=r.key;
+      delete local._pend;
+      toast(editKey?'✅ Actualizado en Google Sheets':'✅ Guardado en Google Sheets');
+    }else{
+      toast('⚠️ '+(r.error||'El Sheet rechazó el guardado'),true);
+      loadData();
+    }
+  }catch(err){
+    toast('⚠️ Sin conexión — verificando contra el Sheet…',true);
+    setTimeout(()=>loadData(),4000);
+  }
+  render();refreshDatalists();
+  btn.disabled=false;btn.textContent='Guardar';saving=false;
+}
+
+// ═══ INIT ══════════════════════════════════════════════════════════════════
+document.getElementById('hdrDate').textContent=new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+['srch','fCli','fTi'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{pg=1;render();}));
+document.getElementById('srchTar').addEventListener('input',renderTarifas);
+document.getElementById('perSel').addEventListener('change',renderCarriers);
+['fTr','fOr','fDe'].forEach(id=>document.getElementById(id).addEventListener('input',updateTarifaHint));
+document.getElementById('ov').addEventListener('click',function(e){if(e.target===this)closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modalOpen)closeModal();});
+setInterval(()=>{if(!modalOpen&&!saving)loadData();},60000);
+loadData();
+</script>
+</body>
+</html>
