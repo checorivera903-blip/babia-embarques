@@ -164,6 +164,23 @@ tbody td{padding:9px 12px;white-space:nowrap;vertical-align:middle;}
 .tipo-f{background:#E7F2E8;color:var(--done);padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;}
 .tipo-v{background:#FBF1E0;color:var(--mx);padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;}
 .tipo-n{background:#EEF1F5;color:var(--plan);padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;}
+.dchips{display:inline-flex;gap:3px;cursor:pointer;}
+.dchip{font-family:'DM Mono',monospace;font-size:8.5px;font-weight:500;padding:2px 6px;border-radius:4px;background:#EEF1F0;color:#9AAA9E;letter-spacing:.3px;}
+.dchip.on{background:var(--done);color:#fff;}
+.dchips:hover .dchip:not(.on){background:var(--mint);color:var(--pine);}
+.doc-sec{border:1px solid var(--line);border-radius:10px;padding:13px 15px;margin-bottom:11px;}
+.doc-t{font-size:9px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--mut);margin-bottom:8px;}
+.doc-list{display:flex;flex-direction:column;gap:5px;margin-bottom:9px;}
+.doc-link{font-size:12.5px;color:var(--pine);text-decoration:none;font-weight:600;}
+.doc-link:hover{text-decoration:underline;}
+.doc-none{font-size:12px;color:#B7C2BA;}
+.doc-up{display:inline-block;cursor:pointer;}
+.carta-prev{border:1px solid var(--line);border-radius:10px;max-height:300px;overflow-y:auto;background:#FDFDFB;padding:0;}
+.cob-v{background:#FBEAE6;color:var(--late);padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;}
+.cob-x{background:#FBF1E0;color:var(--mx);padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;}
+.cob-f{background:#E7EDFC;color:var(--border);padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;}
+.cob-s{background:#EEF1F5;color:var(--plan);padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;}
+.cob-p{background:#E7F2E8;color:var(--done);padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;}
 
 /* ── MODAL ──────────────────────────────── */
 .ov{display:none;position:fixed;inset:0;background:rgba(18,36,25,.5);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(2px);}
@@ -227,6 +244,7 @@ tbody td{padding:9px 12px;white-space:nowrap;vertical-align:middle;}
     <button class="tab sel" data-v="emb" onclick="setView('emb')">📦 Embarques</button>
     <button class="tab" data-v="car" onclick="setView('car')">🚛 Carriers</button>
     <button class="tab" data-v="tar" onclick="setView('tar')">💵 Tarifas</button>
+    <button class="tab" data-v="cob" onclick="setView('cob')">💰 Cobranza</button>
   </div>
 
   <div class="corr-wrap v-emb">
@@ -277,7 +295,7 @@ tbody td{padding:9px 12px;white-space:nowrap;vertical-align:middle;}
         <th onclick="sb('fechaEntrega')">Entrega<span class="arw" id="a-fechaEntrega"></span></th>
         <th>Días</th>
         <th onclick="sb('estatus')">Estatus<span class="arw" id="a-estatus"></span></th>
-        <th>Incidencias</th><th>Notas</th><th></th>
+        <th>Incidencias</th><th>Notas</th><th>Docs</th><th></th>
       </tr></thead>
       <tbody id="tb"></tbody>
     </table>
@@ -318,6 +336,34 @@ tbody td{padding:9px 12px;white-space:nowrap;vertical-align:middle;}
           <th>Última Tarifa</th><th>Fecha</th><th>Promedio</th><th>Rango</th><th>Tipo</th>
         </tr></thead>
         <tbody id="tbTar"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="viewCob" style="display:none">
+    <div class="sec-h">
+      <div class="sec-t">Cobranza por Embarque</div>
+    </div>
+    <p class="car-note">El estado se calcula solo: <b>Por facturar</b> (entregado sin fecha de factura), <b>Programado</b> (pago agendado), <b>Vencido</b> (pasó la fecha programada sin pago) y <b>Pagado</b>. Captura las fechas abriendo el embarque (click en el renglón) en la sección Cobranza.</p>
+    <div class="kpis" id="cobKpis"></div>
+    <div class="toolbar">
+      <input type="text" id="srchCob" placeholder="🔍  Buscar PO o cliente…">
+      <select id="fCob">
+        <option value="">Todos los estados</option>
+        <option value="venc">Vencido</option>
+        <option value="prog">Programado</option>
+        <option value="fact">Facturado s/fecha</option>
+        <option value="porf">Por facturar</option>
+        <option value="pag">Pagado</option>
+      </select>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>PO / ID</th><th>Cliente</th><th>Tarifa</th>
+          <th>F. Factura</th><th>Pago Programado</th><th>Días</th><th>F. Pagado</th><th>Estado</th>
+        </tr></thead>
+        <tbody id="tbCob"></tbody>
       </table>
     </div>
   </div>
@@ -363,6 +409,30 @@ tbody td{padding:9px 12px;white-space:nowrap;vertical-align:middle;}
     </div>
   </div>
 </div>
+<div class="ov" id="ovFicha">
+  <div class="modal" style="width:720px">
+    <div class="mhdr"><h2 id="fichaTitle">Embarque</h2><button class="mclose" onclick="closeFicha()">✕</button></div>
+    <div class="mbody" id="fichaBody"></div>
+    <div class="mfoot" style="justify-content:space-between">
+      <div><button class="bcn" onclick="fichaCarta()">✉️ Carta de Instrucciones</button></div>
+      <div style="display:flex;gap:8px"><button class="bcn" onclick="fichaEdit()">✏️ Editar</button><button class="bsv" onclick="closeFicha()">Cerrar</button></div>
+    </div>
+  </div>
+</div>
+<div class="ov" id="ovCarta">
+  <div class="modal" style="width:660px">
+    <div class="mhdr"><h2 id="cartaTitle">Carta de Instrucciones</h2><button class="mclose" onclick="closeCarta()">✕</button></div>
+    <div class="mbody">
+      <div class="fg">
+        <div class="fi"><label>Para — correo del transportista <span class="req">*</span></label><input id="cTo" type="email" placeholder="operaciones@carrier.com"/></div>
+        <div class="fi"><label>CC (opcional)</label><input id="cCc" type="email" placeholder="copia@correo.com"/></div>
+        <div class="fi full"><label>Instrucciones adicionales</label><textarea id="cExtra" placeholder="Cita, referencias, contacto en destino…"></textarea></div>
+        <div class="fi full"><label>Vista previa del correo</label><div id="cartaPrev" class="carta-prev"></div></div>
+      </div>
+    </div>
+    <div class="mfoot"><button class="bcn" onclick="closeCarta()">Cancelar</button><button class="bsv" id="bCarta" onclick="sendCarta()">📧 Enviar por correo</button></div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -371,8 +441,8 @@ tbody td{padding:9px 12px;white-space:nowrap;vertical-align:middle;}
 const API = 'https://script.google.com/macros/s/AKfycbx1HNs405hYl3hTOzJUvGF9zopCS8Sm8fQKHcYvfc9mZwe01HKNq_e8eViR_yPScMHb3g/exec';
 // ═══════════════════════════════════════════════════════════════════════════
 
-const FIELDS = ['id','cliente','producto','tipo','origen','destino','transportista','temp','tempLlegada','peso','cajas','tarifa','citaCarga','diaCarga','diaDescarga','fechaEntrega','diasTr','estatus','incidencias','acciones'];
-const DATE_FIELDS = new Set(['citaCarga','diaCarga','diaDescarga','fechaEntrega']);
+const FIELDS = ['id','cliente','producto','tipo','origen','destino','transportista','temp','tempLlegada','peso','cajas','tarifa','citaCarga','diaCarga','diaDescarga','fechaEntrega','diasTr','estatus','incidencias','acciones','pod','factura','docs','fechaFactura','fechaPagoProg','fechaPago'];
+const DATE_FIELDS = new Set(['citaCarga','diaCarga','diaDescarga','fechaEntrega','fechaFactura','fechaPagoProg','fechaPago']);
 const TEMP_TOL = 3; // tolerancia °F para cumplimiento de temperatura
 
 let data=[], editKey=null, sk=null, sa=true, pg=1, stageSel='';
@@ -477,9 +547,11 @@ function setView(v){
   document.querySelectorAll('.v-emb').forEach(el=>el.style.display=v==='emb'?'':'none');
   document.getElementById('viewCar').style.display=v==='car'?'':'none';
   document.getElementById('viewTar').style.display=v==='tar'?'':'none';
+  document.getElementById('viewCob').style.display=v==='cob'?'':'none';
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('sel',t.dataset.v===v));
   if(v==='car')renderCarriers();
   if(v==='tar')renderTarifas();
+  if(v==='cob')renderCobranza();
 }
 
 function rateNum(v){
@@ -726,6 +798,7 @@ function render(){
   carrierStats().forEach(c=>{if(c.grade)_gmap[c.name.toLowerCase()]=c.grade;});
   if(view==='car')renderCarriers();
   if(view==='tar')renderTarifas();
+  if(view==='cob')renderCobranza();
   // Corredor (sobre todos los datos)
   const counts={plan:0,mx:0,border:0,usa:0,done:0,late:0,cancel:0,none:0};
   data.forEach(e=>counts[stage(e.estatus)]++);
@@ -749,13 +822,13 @@ function render(){
   const s=(pg-1)*PP, paged=f.slice(s,s+PP);
   const tb=document.getElementById('tb');
   if(!f.length){
-    tb.innerHTML=`<tr><td colspan="18"><div class="empty">🥬 No hay embarques con estos filtros.<br><button class="btn ghost" onclick="clearFilters()">Limpiar filtros</button></div></td></tr>`;
+    tb.innerHTML=`<tr><td colspan="19"><div class="empty">🥬 No hay embarques con estos filtros.<br><button class="btn ghost" onclick="clearFilters()">Limpiar filtros</button></div></td></tr>`;
     document.getElementById('pag').innerHTML='';
     return;
   }
   tb.innerHTML=paged.map(e=>{
     const st=stage(e.estatus);
-    return `<tr class="${st==='late'?'late-row':''}${e._pend?' pend':''}" title="${e._pend?'Guardando en Google Sheets…':''}">
+    return `<tr class="${st==='late'?'late-row':''}${e._pend?' pend':''}" style="cursor:pointer" onclick='openFicha(${JSON.stringify(String(e.key))})' title="${e._pend?'Guardando en Google Sheets…':'Click para abrir el embarque'}">
     <td><span class="po">${esc(e.id)||'—'}</span></td>
     <td style="font-weight:600">${esc(e.cliente)||'—'}</td>
     <td>${esc(e.producto)||'—'}</td>
@@ -773,9 +846,11 @@ function render(){
     <td>${pill(e.estatus)}</td>
     <td class="inc-c" title="${esc(e.incidencias)}">${esc(e.incidencias)||'<span style="color:#C6D2C9">—</span>'}</td>
     <td class="obs-c" title="${esc(e.acciones)}">${esc(e.acciones)||'—'}</td>
+    <td>${docChips(e)}</td>
     <td style="white-space:nowrap">
-      <button class="act-b" onclick='editRow(${JSON.stringify(String(e.key))})' title="Editar">✏️</button>
-      <button class="act-b" onclick='delRow(${JSON.stringify(String(e.key))})' title="Eliminar">🗑️</button>
+      <button class="act-b" onclick='event.stopPropagation();openCarta(${JSON.stringify(String(e.key))})' title="Carta de Instrucciones">✉️</button>
+      <button class="act-b" onclick='event.stopPropagation();editRow(${JSON.stringify(String(e.key))})' title="Editar">✏️</button>
+      <button class="act-b" onclick='event.stopPropagation();delRow(${JSON.stringify(String(e.key))})' title="Eliminar">🗑️</button>
     </td>
   </tr>`;}).join('');
   const tp=Math.ceil(f.length/PP);
@@ -947,14 +1022,225 @@ async function saveEmbarque(){
   btn.disabled=false;btn.textContent='Guardar';saving=false;
 }
 
+// ═══ DOCUMENTOS (POD / FACTURA / EXTRAS) ═══════════════════════════════════
+let docsKey=null, cartaKey=null;
+
+function docEntries(v){
+  return String(v||'').split(' | ').map(s=>s.trim()).filter(Boolean).map(s=>{
+    const i=s.indexOf('::');
+    return i>0?{name:s.slice(0,i),url:s.slice(i+2)}:{name:'documento',url:s};
+  });
+}
+function docChips(e){
+  const p=docEntries(e.pod).length,f=docEntries(e.factura).length,x=docEntries(e.docs).length;
+  return `<div class="dchips" onclick='event.stopPropagation();openFicha(${JSON.stringify(String(e.key))})' title="Abrir embarque">`+
+    `<span class="dchip ${p?'on':''}">POD</span><span class="dchip ${f?'on':''}">FAC</span><span class="dchip ${x?'on':''}">${x?'+'+x:'＋'}</span></div>`;
+}
+
+function docSectionsHtml(e){
+  const sec=(title,docType,entries,single)=>{
+    const list=entries.length?entries.map(d=>`<a class="doc-link" href="${d.url}" target="_blank" rel="noopener">📄 ${esc(d.name)}</a>`).join(''):'<span class="doc-none">Sin archivo</span>';
+    const btn=single&&entries.length?'Reemplazar':'Subir archivo';
+    return `<div class="doc-sec"><div class="doc-t">${title}</div><div class="doc-list">${list}</div>`+
+      `<label class="btn ghost doc-up"><span id="up-${docType}">📤 ${btn}</span><input type="file" style="display:none" onchange="uploadDoc('${docType}',this)"></label></div>`;
+  };
+  return sec('POD — Prueba de Entrega','POD',docEntries(e.pod),true)+
+    sec('Factura','FACTURA',docEntries(e.factura),true)+
+    sec('Documentos extra','DOCS',docEntries(e.docs),false)+
+    '<div style="font-size:10.5px;color:var(--mut)">Los archivos se guardan en Google Drive (carpeta "BABIA - Documentos de Embarques") ligados a este embarque. Máx 15 MB por archivo.</div>';
+}
+
+function openFicha(key){
+  docsKey=key;modalOpen=true;
+  renderFicha();
+  document.getElementById('ovFicha').classList.add('on');
+}
+function closeFicha(){document.getElementById('ovFicha').classList.remove('on');modalOpen=false;}
+function fichaEdit(){const k=docsKey;closeFicha();editRow(k);}
+function fichaCarta(){const k=docsKey;closeFicha();openCarta(k);}
+
+function renderFicha(){
+  const e=data.find(x=>String(x.key)===String(docsKey));if(!e)return;
+  document.getElementById('fichaTitle').textContent=`Embarque ${e.id}${e.cliente?' · '+e.cliente:''}`;
+  const item=(l,v)=>`<div class="fi"><label>${l}</label><div style="font-size:13px;font-weight:600;padding:2px 0">${v||'—'}</div></div>`;
+  document.getElementById('fichaBody').innerHTML=
+    `<div style="margin-bottom:12px">${pill(e.estatus)}${e._pend?' <span style="font-size:11px;color:var(--mut)">· sincronizando con el Sheet…</span>':''}</div>`+
+    `<div class="fg" style="margin-bottom:16px">`+
+    item('Producto',esc(e.producto))+item('Tipo',esc(e.tipo))+
+    item('Origen',esc(e.origen))+item('Destino',esc(e.destino))+
+    item('Transportista',esc(e.transportista)+gchipFor(e.transportista))+item('Temperatura',e.temp!==''&&e.temp!=null?esc(e.temp)+' °F':'')+
+    item('Cajas',esc(e.cajas))+item('Peso',e.peso?esc(e.peso)+' kg':'')+
+    item('Tarifa',rateNum(e.tarifa)!=null?fmt$(rateNum(e.tarifa)):'')+item('Días de tránsito',diasTr(e)==='—'?'':diasTr(e))+
+    item('Cita de carga',fd(e.citaCarga)==='—'?'':fd(e.citaCarga))+item('Día de carga',fd(e.diaCarga)==='—'?'':fd(e.diaCarga))+
+    item('Día de descarga',fd(e.diaDescarga)==='—'?'':fd(e.diaDescarga))+item('Fecha compromiso',fd(e.fechaEntrega)==='—'?'':fd(e.fechaEntrega))+
+    (e.incidencias?`<div class="fi full"><label>Incidencias</label><div style="font-size:12.5px;color:var(--late);font-weight:600">${esc(e.incidencias)}</div></div>`:'')+
+    (e.acciones?`<div class="fi full"><label>Notas / Acciones</label><div style="font-size:12.5px">${esc(e.acciones)}</div></div>`:'')+
+    `</div>`+
+    `<div class="doc-t" style="letter-spacing:2px;margin-bottom:10px">💵 COBRANZA</div>`+
+    `<div class="doc-sec"><div class="fg">`+
+    `<div class="fi"><label>Fecha de Factura</label><input type="date" id="cbF" value="${e.fechaFactura||''}"></div>`+
+    `<div class="fi"><label>Pago Programado</label><input type="date" id="cbP" value="${e.fechaPagoProg||''}"></div>`+
+    `<div class="fi"><label>Pago Realizado</label><input type="date" id="cbR" value="${e.fechaPago||''}"></div>`+
+    `<div class="fi" style="justify-content:flex-end"><button class="btn ghost" id="bCob" onclick="saveCobranza()">💾 Guardar cobranza</button></div>`+
+    `</div>${cobStatus(e)?'<div style="margin-top:8px">'+cobChip(cobStatus(e))+'</div>':''}</div>`+
+    `<div class="doc-t" style="letter-spacing:2px;margin-bottom:10px;margin-top:14px">📎 DOCUMENTOS DEL EMBARQUE</div>`+
+    docSectionsHtml(e);
+}
+
+function fileB64(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(f);});}
+async function uploadDoc(docType,inp){
+  const f=inp.files[0];if(!f)return;
+  if(String(docsKey).startsWith('tmp-')){toast('Espera unos segundos a que sincronice el embarque',true);inp.value='';return;}
+  if(f.size>15*1024*1024){toast('Archivo muy pesado (máx 15 MB)',true);inp.value='';return;}
+  const e=data.find(x=>String(x.key)===String(docsKey));if(!e)return;
+  const lbl=document.getElementById('up-'+docType);const prev=lbl.textContent;lbl.textContent='⏳ Subiendo…';
+  try{
+    const b64=await fileB64(f);
+    const r=await callAPI({action:'upload',key:docsKey,docType,filename:f.name,mimeType:f.type||'application/octet-stream',data:b64});
+    if(r.ok){
+      if(docType==='DOCS')e.docs=e.docs?e.docs+' | '+r.entry:r.entry;
+      else if(docType==='POD')e.pod=r.entry;
+      else e.factura=r.entry;
+      toast('✅ '+f.name+' subido a Drive');
+      renderFicha();render();
+    }else{toast('⚠️ '+(r.error||'Error al subir'),true);renderFicha();}
+  }catch(err){toast('⚠️ Sin conexión al subir',true);renderFicha();}
+  inp.value='';
+}
+
+// ═══ COBRANZA ══════════════════════════════════════════════════════════════
+function cobStatus(e){
+  const hoy=today();
+  if(e.fechaPago)return{k:'pag',label:'Pagado',order:4};
+  if(e.fechaFactura){
+    if(e.fechaPagoProg){
+      const diff=Math.round((new Date(e.fechaPagoProg+'T12:00')-new Date(hoy+'T12:00'))/86400000);
+      if(diff<0)return{k:'venc',label:`Vencido ${-diff}d`,order:0,dias:diff};
+      return{k:'prog',label:diff===0?'Vence hoy':`Programado`,order:1,dias:diff};
+    }
+    return{k:'fact',label:'Facturado s/fecha',order:2};
+  }
+  if(stage(e.estatus)==='done')return{k:'porf',label:'Por facturar',order:3};
+  return null;
+}
+function cobChip(st){
+  const cls={venc:'cob-v',prog:st&&st.dias===0?'cob-x':'cob-x',fact:'cob-f',porf:'cob-s',pag:'cob-p'}[st.k];
+  return `<span class="${cls}">${st.label}</span>`;
+}
+function renderCobranza(){
+  const q=(document.getElementById('srchCob').value||'').toLowerCase().trim();
+  const fs=document.getElementById('fCob').value;
+  const hoy=today(), mes=hoy.slice(0,7);
+  let list=data.map(e=>({e,st:cobStatus(e)})).filter(x=>x.st);
+  // KPIs sobre todo (sin filtros)
+  const sum=arr=>arr.reduce((a,x)=>a+(rateNum(x.e.tarifa)||0),0);
+  const porCobrar=list.filter(x=>x.st.k==='venc'||x.st.k==='prog'||x.st.k==='fact');
+  const vencidos=list.filter(x=>x.st.k==='venc');
+  const pagadosMes=list.filter(x=>x.st.k==='pag'&&String(x.e.fechaPago).slice(0,7)===mes);
+  const porFacturar=list.filter(x=>x.st.k==='porf');
+  document.getElementById('cobKpis').innerHTML=
+    `<div class="kpi"><div class="kpi-l">Por cobrar</div><div class="kpi-v">${fmt$(sum(porCobrar))}</div><div class="kpi-s">${porCobrar.length} factura${porCobrar.length!==1?'s':''} pendiente${porCobrar.length!==1?'s':''}</div></div>`+
+    `<div class="kpi warn"><div class="kpi-l">Vencido</div><div class="kpi-v">${fmt$(sum(vencidos))}</div><div class="kpi-s">${vencidos.length} factura${vencidos.length!==1?'s':''}</div></div>`+
+    `<div class="kpi"><div class="kpi-l">Pagado este mes</div><div class="kpi-v">${fmt$(sum(pagadosMes))}</div><div class="kpi-s">${pagadosMes.length} pago${pagadosMes.length!==1?'s':''}</div></div>`+
+    `<div class="kpi"><div class="kpi-l">Por facturar</div><div class="kpi-v">${porFacturar.length}</div><div class="kpi-s">entregados sin factura</div></div>`;
+  // Filtros de la tabla
+  if(q)list=list.filter(x=>[x.e.id,x.e.cliente].some(v=>v&&v.toLowerCase().includes(q)));
+  if(fs)list=list.filter(x=>x.st.k===fs);
+  list.sort((a,b)=>a.st.order-b.st.order||String(a.e.fechaPagoProg||'').localeCompare(String(b.e.fechaPagoProg||'')));
+  const tb=document.getElementById('tbCob');
+  if(!list.length){
+    tb.innerHTML='<tr><td colspan="8"><div class="empty">💰 Sin registros de cobranza con estos filtros.</div></td></tr>';
+    return;
+  }
+  tb.innerHTML=list.map(({e,st})=>{
+    const dias=st.dias==null?'—':(st.dias<0?`<span style="color:var(--late);font-weight:700">${st.dias}d</span>`:st.dias+'d');
+    return `<tr style="cursor:pointer" onclick='openFicha(${JSON.stringify(String(e.key))})' class="${st.k==='venc'?'late-row':''}">
+    <td><span class="po">${esc(e.id)}</span></td>
+    <td style="font-weight:600">${esc(e.cliente)||'—'}</td>
+    <td class="mono">${rateNum(e.tarifa)!=null?fmt$(rateNum(e.tarifa)):'—'}</td>
+    <td class="mono">${fd(e.fechaFactura)}</td>
+    <td class="mono">${fd(e.fechaPagoProg)}</td>
+    <td class="mono">${dias}</td>
+    <td class="mono">${fd(e.fechaPago)}</td>
+    <td>${cobChip(st)}</td>
+  </tr>`;}).join('');
+}
+async function saveCobranza(){
+  const e=data.find(x=>String(x.key)===String(docsKey));if(!e)return;
+  if(String(docsKey).startsWith('tmp-')){toast('Espera a que sincronice el embarque',true);return;}
+  const ff=document.getElementById('cbF').value,fp=document.getElementById('cbP').value,fr=document.getElementById('cbR').value;
+  const btn=document.getElementById('bCob');btn.disabled=true;btn.textContent='Guardando…';
+  try{
+    const r=await callAPI({action:'update',key:docsKey,fechaFactura:ff,fechaPagoProg:fp,fechaPago:fr});
+    if(r.ok){
+      e.fechaFactura=ff;e.fechaPagoProg=fp;e.fechaPago=fr;
+      toast('✅ Cobranza actualizada');render();
+      if(view==='cob')renderCobranza();
+    }else toast('⚠️ '+(r.error||'No se pudo guardar'),true);
+  }catch(err){toast('⚠️ Sin conexión',true);}
+  btn.disabled=false;btn.textContent='💾 Guardar cobranza';
+}
+
+// ═══ CARTA DE INSTRUCCIONES ════════════════════════════════════════════════
+function openCarta(key){
+  if(String(key).startsWith('tmp-')){toast('Espera unos segundos a que sincronice el embarque',true);return;}
+  cartaKey=key;modalOpen=true;
+  const e=data.find(x=>String(x.key)===String(key));
+  if(!e)return;
+  document.getElementById('cartaTitle').textContent=`Carta de Instrucciones · ${e.id}`;
+  document.getElementById('cTo').value='';
+  document.getElementById('cCc').value='';
+  document.getElementById('cExtra').value='';
+  renderCartaPrev();
+  document.getElementById('ovCarta').classList.add('on');
+}
+function closeCarta(){document.getElementById('ovCarta').classList.remove('on');modalOpen=false;}
+function renderCartaPrev(){
+  const e=data.find(x=>String(x.key)===String(cartaKey));
+  if(!e)return;
+  const extra=document.getElementById('cExtra').value.trim();
+  const notas=[e.acciones,extra].filter(Boolean).map(esc).join('<br>');
+  const row=(k,v)=>v?`<tr><td style="padding:5px 12px;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--mut);white-space:nowrap;vertical-align:top">${k}</td><td style="padding:5px 12px;font-size:12px;font-weight:600">${esc(v)}</td></tr>`:'';
+  document.getElementById('cartaPrev').innerHTML=
+    `<div style="background:var(--pine);padding:14px 18px;color:#fff"><div style="font-weight:800;letter-spacing:3px;font-size:16px">BABIA</div><div style="font-size:9px;letter-spacing:1.6px;color:#A8C5AF">CARTA DE INSTRUCCIONES · EMBARQUE ${esc(e.id)}</div></div>`+
+    `<div style="padding:14px 18px;font-size:12px">`+
+    `<p>Estimado transportista <b>${esc(e.transportista)||'—'}</b>: se giran las instrucciones del siguiente embarque. Favor de <b>confirmar de recibido</b>.</p>`+
+    `<table style="width:100%;border-collapse:collapse;background:var(--paper);border-radius:8px">`+
+    row('Referencia / PO',e.id)+row('Producto',e.producto)+row('Temperatura',e.temp?e.temp+' °F continuos':'')+
+    row('Cajas',e.cajas)+row('Peso',e.peso?e.peso+' kg':'')+
+    row('Origen (carga)',e.origen)+row('Cita de carga',fd(e.citaCarga)==='—'?'':fd(e.citaCarga))+row('Día de carga',fd(e.diaCarga)==='—'?'':fd(e.diaCarga))+
+    row('Destino (entrega)',e.destino)+row('Día de descarga',fd(e.diaDescarga)==='—'?'':fd(e.diaDescarga))+row('Fecha compromiso',fd(e.fechaEntrega)==='—'?'':fd(e.fechaEntrega))+
+    `</table>`+
+    (notas?`<p style="background:#FFF7E6;border:1px solid #F0C36D;border-radius:8px;padding:8px 12px;font-size:11px"><b>Instrucciones adicionales:</b><br>${notas}</p>`:'')+
+    `<p style="font-size:10.5px;color:var(--mut)">Es responsabilidad del transportista mantener la cadena de frío, reportar incidencias de inmediato y entregar el POD firmado y sellado.</p>`+
+    `<p>Atentamente,<br><b>BABIA · Logística</b></p></div>`;
+}
+async function sendCarta(){
+  const to=document.getElementById('cTo').value.trim();
+  if(!to||!to.includes('@')){toast('Captura el correo del transportista',true);return;}
+  const btn=document.getElementById('bCarta');
+  btn.disabled=true;btn.textContent='Enviando…';
+  try{
+    const r=await callAPI({action:'carta',key:cartaKey,to,cc:document.getElementById('cCc').value.trim(),extra:document.getElementById('cExtra').value.trim()});
+    if(r.ok){toast('📧 Carta enviada a '+to);closeCarta();}
+    else toast('⚠️ '+(r.error||'No se pudo enviar'),true);
+  }catch(err){toast('⚠️ Sin conexión al enviar',true);}
+  btn.disabled=false;btn.textContent='📧 Enviar por correo';
+}
+
 // ═══ INIT ══════════════════════════════════════════════════════════════════
 document.getElementById('hdrDate').textContent=new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 ['srch','fCli','fTi'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{pg=1;render();}));
 document.getElementById('srchTar').addEventListener('input',renderTarifas);
+document.getElementById('srchCob').addEventListener('input',renderCobranza);
+document.getElementById('fCob').addEventListener('change',renderCobranza);
 document.getElementById('perSel').addEventListener('change',renderCarriers);
 ['fTr','fOr','fDe'].forEach(id=>document.getElementById(id).addEventListener('input',updateTarifaHint));
 document.getElementById('ov').addEventListener('click',function(e){if(e.target===this)closeModal();});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modalOpen)closeModal();});
+document.getElementById('ovFicha').addEventListener('click',function(e){if(e.target===this)closeFicha();});
+document.getElementById('ovCarta').addEventListener('click',function(e){if(e.target===this)closeCarta();});
+document.getElementById('cExtra').addEventListener('input',renderCartaPrev);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modalOpen){closeModal();closeFicha();closeCarta();}});
 setInterval(()=>{if(!modalOpen&&!saving)loadData();},60000);
 loadData();
 </script>
