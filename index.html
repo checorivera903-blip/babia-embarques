@@ -430,7 +430,7 @@ tbody td{padding:9px 12px;white-space:nowrap;vertical-align:middle;}
         <div class="fi full"><label>Vista previa del correo</label><div id="cartaPrev" class="carta-prev"></div></div>
       </div>
     </div>
-    <div class="mfoot"><button class="bcn" onclick="closeCarta()">Cancelar</button><button class="bsv" id="bCarta" onclick="sendCarta()">📧 Enviar por correo</button></div>
+    <div class="mfoot" style="justify-content:space-between"><button class="bcn" onclick="closeCarta()">Cancelar</button><div style="display:flex;gap:8px"><button class="bcn" onclick="downloadCartaPDF()">📄 Descargar PDF</button><button class="bsv" id="bCarta" onclick="sendCarta()">📧 Enviar por correo</button></div></div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -1195,25 +1195,43 @@ function openCarta(key){
   document.getElementById('ovCarta').classList.add('on');
 }
 function closeCarta(){document.getElementById('ovCarta').classList.remove('on');modalOpen=false;}
+function cartaBodyHtml(e,extra){
+  const notas=[e.acciones,extra].filter(Boolean).map(esc).join('<br>');
+  const row=(k,v)=>v?`<tr><td style="padding:8px 14px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#5C6B60;white-space:nowrap;vertical-align:top;border-bottom:1px solid #EDF2EE">${k}</td><td style="padding:8px 14px;font-size:13px;font-weight:700;color:#17241D;border-bottom:1px solid #EDF2EE">${esc(v)}</td></tr>`:'';
+  const f=d=>fd(d)==='—'?'':fd(d);
+  return `<div style="background:#123B22;padding:24px 30px;color:#fff">`+
+    `<div style="font-weight:800;letter-spacing:4px;font-size:24px;font-family:Arial,Helvetica,sans-serif">BABIA</div>`+
+    `<div style="font-size:10px;letter-spacing:2px;color:#A8C5AF;margin-top:4px">CARTA DE INSTRUCCIONES · EMBARQUE ${esc(e.id)}</div></div>`+
+    `<div style="padding:22px 30px;font-family:Arial,Helvetica,sans-serif">`+
+    `<p style="font-size:12px;color:#5C6B60;margin:0 0 14px">Fecha de emisión: ${new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'})} · Favor de confirmar de recibido.</p>`+
+    `<table style="width:100%;border-collapse:collapse;background:#F7FAF6">`+
+    row('Referencia / PO',e.id)+row('Transportista',e.transportista)+row('Producto',e.producto)+
+    row('Temperatura de transporte',e.temp!==''&&e.temp!=null?e.temp+' °F continuos':'')+
+    row('Cajas',e.cajas)+row('Peso',e.peso?e.peso+' kg':'')+
+    row('Origen (carga)',e.origen)+row('Cita de carga',f(e.citaCarga))+row('Día de carga',f(e.diaCarga))+
+    row('Destino (entrega)',e.destino)+row('Día de descarga',f(e.diaDescarga))+row('Fecha compromiso de entrega',f(e.fechaEntrega))+
+    `</table>`+
+    (notas?`<p style="background:#FFF7E6;border:1px solid #F0C36D;border-radius:8px;padding:10px 14px;font-size:12px;color:#17241D"><b>Instrucciones adicionales:</b><br>${notas}</p>`:'')+
+    `<p style="font-size:11px;color:#5C6B60">Es responsabilidad del transportista mantener la cadena de frío durante todo el trayecto, reportar de inmediato cualquier incidencia y entregar el POD firmado y sellado al concluir la entrega.</p>`+
+    `<p style="font-size:13px;color:#17241D;margin-top:26px">Atentamente,<br><b>BABIA · Logística</b></p>`+
+    `</div>`;
+}
 function renderCartaPrev(){
   const e=data.find(x=>String(x.key)===String(cartaKey));
   if(!e)return;
+  document.getElementById('cartaPrev').innerHTML=cartaBodyHtml(e,document.getElementById('cExtra').value.trim());
+}
+function downloadCartaPDF(){
+  const e=data.find(x=>String(x.key)===String(cartaKey));if(!e)return;
   const extra=document.getElementById('cExtra').value.trim();
-  const notas=[e.acciones,extra].filter(Boolean).map(esc).join('<br>');
-  const row=(k,v)=>v?`<tr><td style="padding:5px 12px;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--mut);white-space:nowrap;vertical-align:top">${k}</td><td style="padding:5px 12px;font-size:12px;font-weight:600">${esc(v)}</td></tr>`:'';
-  document.getElementById('cartaPrev').innerHTML=
-    `<div style="background:var(--pine);padding:14px 18px;color:#fff"><div style="font-weight:800;letter-spacing:3px;font-size:16px">BABIA</div><div style="font-size:9px;letter-spacing:1.6px;color:#A8C5AF">CARTA DE INSTRUCCIONES · EMBARQUE ${esc(e.id)}</div></div>`+
-    `<div style="padding:14px 18px;font-size:12px">`+
-    `<p>Estimado transportista <b>${esc(e.transportista)||'—'}</b>: se giran las instrucciones del siguiente embarque. Favor de <b>confirmar de recibido</b>.</p>`+
-    `<table style="width:100%;border-collapse:collapse;background:var(--paper);border-radius:8px">`+
-    row('Referencia / PO',e.id)+row('Producto',e.producto)+row('Temperatura',e.temp?e.temp+' °F continuos':'')+
-    row('Cajas',e.cajas)+row('Peso',e.peso?e.peso+' kg':'')+
-    row('Origen (carga)',e.origen)+row('Cita de carga',fd(e.citaCarga)==='—'?'':fd(e.citaCarga))+row('Día de carga',fd(e.diaCarga)==='—'?'':fd(e.diaCarga))+
-    row('Destino (entrega)',e.destino)+row('Día de descarga',fd(e.diaDescarga)==='—'?'':fd(e.diaDescarga))+row('Fecha compromiso',fd(e.fechaEntrega)==='—'?'':fd(e.fechaEntrega))+
-    `</table>`+
-    (notas?`<p style="background:#FFF7E6;border:1px solid #F0C36D;border-radius:8px;padding:8px 12px;font-size:11px"><b>Instrucciones adicionales:</b><br>${notas}</p>`:'')+
-    `<p style="font-size:10.5px;color:var(--mut)">Es responsabilidad del transportista mantener la cadena de frío, reportar incidencias de inmediato y entregar el POD firmado y sellado.</p>`+
-    `<p>Atentamente,<br><b>BABIA · Logística</b></p></div>`;
+  const w=window.open('','_blank');
+  if(!w){toast('Permite las ventanas emergentes para generar el PDF',true);return;}
+  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Carta_Instrucciones_'+esc(e.id).replace(/[^a-zA-Z0-9_-]/g,'_')+'</title>'+
+    '<style>body{margin:0;background:#fff}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>'+
+    '<div style="max-width:700px;margin:0 auto;border:1px solid #DFE8E0">'+cartaBodyHtml(e,extra)+'</div>'+
+    '<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},300);}</scr'+'ipt></body></html>');
+  w.document.close();
+  toast('En el diálogo de impresión elige "Guardar como PDF" 📄');
 }
 async function sendCarta(){
   const to=document.getElementById('cTo').value.trim();
